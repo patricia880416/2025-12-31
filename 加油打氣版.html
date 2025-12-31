@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我們的溫馨手帳</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --oatmeal: #f5f2ed;
+            --latte: #e8e2d6;
+            --warm-gray: #7d746d;
+            --earth-green: #8c9c8e;
+            --wood-brown: #a68b6d;
+            --soft-white: #ffffff;
+        }
+        body { background-color: var(--oatmeal); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; color: var(--warm-gray); -webkit-tap-highlight-color: transparent; }
+        .tab-active { color: var(--wood-brown); font-weight: bold; position: relative; }
+        .tab-active::after { content: ''; position: absolute; bottom: -6px; left: 20%; width: 60%; height: 2px; background: var(--wood-brown); border-radius: 10px; }
+        .warm-card { background: var(--soft-white); border-radius: 24px; box-shadow: 0 4px 15px rgba(166, 139, 109, 0.08); border: 1px solid var(--latte); transition: transform 0.2s; }
+        .input-box { background-color: #faf9f7; border: 1px solid var(--latte); border-radius: 14px; padding: 12px; width: 100%; font-size: 14px; color: var(--warm-gray); appearance: none; }
+        .btn-primary { background-color: var(--wood-brown); color: white; transition: all 0.3s; }
+        .btn-primary:active { transform: scale(0.95); }
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(245, 242, 237, 0.8); z-index: 999; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
+        .challenge-btn { background: white; border: 1px solid var(--latte); border-radius: 18px; padding: 16px; text-align: left; }
+        .challenge-btn:active { background: var(--latte); }
+    </style>
+</head>
+<body class="pb-24">
+
+    <div id="loader" class="loading-overlay flex flex-col">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-[#a68b6d]"></div>
+        <p class="mt-4 text-xs italic tracking-widest">同步數據中...</p>
+    </div>
+
+    <div class="pt-8 pb-4 text-center">
+        <h1 class="text-xl font-serif font-bold text-[#6d5f56] tracking-widest">生活手帳</h1>
+        <div id="randomSlogan" class="text-[11px] text-[#a68b6d] mt-2 italic h-4 px-10 leading-relaxed transition-opacity duration-500"></div>
+    </div>
+
+    <nav class="sticky top-0 z-50 bg-[#f5f2ed]/90 backdrop-blur-md border-b border-[#e8e2d6]">
+        <div class="max-w-md mx-auto flex justify-around py-4">
+            <button onclick="switchPage('ledger')" id="nav-ledger" class="text-sm tab-active">日常記帳</button>
+            <button onclick="switchPage('savings')" id="nav-savings" class="text-sm text-gray-400">儲蓄挑戰</button>
+        </div>
+    </nav>
+
+    <div class="max-w-md mx-auto px-5 mt-4">
+        
+        <div id="page-ledger">
+            <div class="warm-card p-6 mb-6 text-center">
+                <p class="text-[10px] tracking-widest text-gray-400">CURRENT BALANCE</p>
+                <h2 class="text-3xl font-serif font-bold text-[#6d5f56] mt-1" id="balanceDisplay">$ 0</h2>
+                <button onclick="fetchCloudData()" class="mt-4 text-[10px] text-wood-brown opacity-60"><i class="fas fa-sync-alt mr-1"></i> 手動刷新雲端資料</button>
+            </div>
+
+            <div class="warm-card p-5 mb-8">
+                <div class="flex justify-center gap-8 mb-6 text-sm">
+                    <button id="tabExp" onclick="changeType('expense')" class="font-bold text-wood-brown border-b-2 border-wood-brown pb-1">支出 (-)</button>
+                    <button id="tabInc" onclick="changeType('income')" class="text-gray-400 pb-1">收入 (+)</button>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="date" id="dateInput" class="input-box">
+                        <select id="methodInput" class="input-box"></select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="catInput" class="input-box"></select>
+                        <select id="attrInput" class="input-box"></select>
+                    </div>
+                    <input type="number" id="amtInput" placeholder="輸入金額" class="input-box text-lg font-medium">
+                    <input type="text" id="noteInput" placeholder="寫點備註吧..." class="input-box">
+                    <button onclick="saveToCloud()" class="w-full btn-primary py-3 rounded-2xl font-bold shadow-md mt-2">同步至雲端帳本</button>
+                </div>
+            </div>
+            
+            <h3 class="font-bold text-xs text-gray-400 mb-4 tracking-widest uppercase">Recent History</h3>
+            <div id="list" class="space-y-3 pb-10"></div>
+        </div>
+
+        <div id="page-savings" class="hidden">
+            <div class="warm-card p-6 mb-6 flex justify-between items-center bg-[#fdfbf7]">
+                <div>
+                    <p class="text-[10px] text-gray-400 tracking-widest">TOTAL SAVED</p>
+                    <h2 class="text-3xl font-serif font-bold text-earth-green" id="totalSavingsDisplay">$ 0</h2>
+                </div>
+                <div class="w-12 h-12 bg-[#f5f2ed] rounded-full flex items-center justify-center text-earth-green">
+                    <i class="fas fa-piggy-bank text-xl"></i>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-8">
+                <button onclick="saveChallenge('365天挑戰', getDayOfYear())" class="challenge-btn">
+                    <p class="font-bold text-[#a68b6d] mb-1">365天存錢</p>
+                    <p class="text-[10px] text-gray-400" id="hint365">今日建議: $0</p>
+                </button>
+                <button onclick="saveChallenge('52週挑戰', getWeekOfYear() * 10)" class="challenge-btn">
+                    <p class="font-bold text-earth-green mb-1">52週挑戰</p>
+                    <p class="text-[10px] text-gray-400" id="hint52">本週建議: $0</p>
+                </button>
+                <button onclick="saveChallenge('50元硬幣', 50)" class="challenge-btn">
+                    <p class="font-bold text-warm-gray mb-1">零錢存進去</p>
+                    <p class="text-[10px] text-gray-400">存一個 50 元</p>
+                </button>
+                <button onclick="saveChallenge('隨機存錢', getRandomAmt())" class="challenge-btn">
+                    <p class="font-bold text-gray-400 mb-1">隨機金額</p>
+                    <p class="text-[10px] text-gray-400">$50 ~ $500</p>
+                </button>
+            </div>
+
+            <div id="goalList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-12 left-1/2 -translate-x-1/2 bg-warm-gray/90 text-white px-6 py-2 rounded-full text-[11px] opacity-0 transition-opacity z-[100] tracking-widest"></div>
+
+    <script>
+        // ================= 配置區 =================
+        // 請在此貼上妳部署後的 Google 網址
+        const API_URL = "你的網址貼在這裡"; 
+
+        const slogans = [
+            "每一筆記錄，都是我們的生活足跡 👣",
+            "努力存錢，是為了帶你去更遠的地方 ✈️",
+            "辛苦啦，今天也要記得對自己好一點 ☕",
+            "存下的不只是錢，還有我們的夢想 💭",
+            "今天的你也辛苦了，抱一個 🧸",
+            "慢慢存，我們的未來會閃閃發光 ✨"
+        ];
+
+        let records = [];
+        let goals = JSON.parse(localStorage.getItem('warm_goals_v2')) || [
+            { id: 101, name: "💍 我們的圓夢基金", target: 50000, current: 0 }
+        ];
+        let currentType = 'expense';
+
+        const cats = {
+            expense: ['🍽️ 飲食', '🚗 交通', '🎮 娛樂', '🏠 住房', '📚 教育', '🛍️ 購物', '🔧 其他'],
+            income: ['💰 薪資', '📈 投資收益', '✨ 其他收入']
+        };
+        const methods = {
+            expense: ['💵 現金', '💳 信用卡', '🟢 LINE Pay', '🏦 轉帳', '🚃 悠遊卡'],
+            income: ['🏦 銀行轉帳', '💵 現金', '🟢 LINE Pay']
+        };
+
+        // ================= 初始化 =================
+        window.onload = () => {
+            document.getElementById('dateInput').valueAsDate = new Date();
+            refreshForm();
+            updateSlogan();
+            updateChallengeHints();
+            fetchCloudData();
+            renderGoals();
+        };
+
+        // ================= 核心邏輯 =================
+        async function fetchCloudData() {
+            if (!API_URL || API_URL.includes("貼在這裡")) return;
+            toggleLoader(true);
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                records = data.reverse();
+                render();
+            } catch (e) {
+                showToast("讀取雲端失敗 ☁️");
+            }
+            toggleLoader(false);
+        }
+
+        async function saveToCloud() {
+            const amtElem = document.getElementById('amtInput');
+            const amt = parseFloat(amtElem.value);
+            if (!amt) return alert("請輸入金額");
+            if (API_URL.includes("貼在這裡")) return alert("尚未設定雲端網址");
+
+            const record = {
+                date: document.getElementById('dateInput').value,
+                type: currentType,
+                cat: document.getElementById('catInput').value,
+                method: document.getElementById('methodInput').value,
+                attr: document.getElementById('attrInput').value,
+                amt: amt,
+                note: document.getElementById('noteInput').value
+            };
+
+            toggleLoader(true);
+            try {
+                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(record) });
+                amtElem.value = '';
+                document.getElementById('noteInput').value = '';
+                showToast("同步成功 ✨");
+                setTimeout(fetchCloudData, 1500);
+            } catch (e) {
+                showToast("同步失敗 ❌");
+                toggleLoader(false);
+            }
+        }
+
+        function render() {
+            const list = document.getElementById('list');
+            let balance = 0;
+            const sorted = [...records].sort((a,b) => new Date(a.date) - new Date(b.date));
+            const balHistory = sorted.map(r => balance = (r.type === 'income' ? balance + Number(r.amt) : balance - Number(r.amt))).reverse();
+            
+            document.getElementById('balanceDisplay').innerText = '$ ' + balance.toLocaleString();
+            
+            list.innerHTML = records.map((r, i) => `
+                <div class="warm-card p-4 flex justify-between items-center bg-[#faf9f7] mb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-[#6d5f56]">${r.cat}</span>
+                            <span class="text-[9px] bg-[#ece6dc] text-wood-brown px-2 py-0.5 rounded-full font-medium">${r.method}</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-1">${r.date} · ${r.note || '無備註'}</p>
+                        <p class="text-[9px] text-[#a68b6d] font-bold mt-1 tracking-wider italic">BAL: $${balHistory[i].toLocaleString()}</p>
+                    </div>
+                    <p class="font-bold text-sm ${r.type==='income'?'text-earth-green':'text-wood-brown'}">
+                        ${r.type==='income'?'+':'-'}${Number(r.amt).toLocaleString()}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        // ================= 儲蓄功能 =================
+        function saveChallenge(name, amt) {
+            goals[0].current += amt;
+            localStorage.setItem('warm_goals_v2', JSON.stringify(goals));
+            renderGoals();
+            showToast(`存入 $${amt} (${name}) 🎋`);
+            updateSlogan();
+        }
+
+        function renderGoals() {
+            const g = goals[0];
+            const percent = Math.min(100, Math.floor((g.current / g.target) * 100));
+            document.getElementById('totalSavingsDisplay').innerText = '$ ' + g.current.toLocaleString();
+            document.getElementById('goalList').innerHTML = `
+                <div class="warm-card p-5 border border-[#e8e2d6]">
+                    <div class="flex justify-between items-start mb-2">
+                        <div><h4 class="font-bold text-[#6d5f56] text-xs">${g.name}</h4><p class="text-[10px] text-gray-400">$${g.current.toLocaleString()} / $${g.target.toLocaleString()}</p></div>
+                        <span class="text-xs font-bold text-earth-green">${percent}%</span>
+                    </div>
+                    <div class="w-full bg-[#f5f2ed] rounded-full h-2 mb-4 overflow-hidden">
+                        <div class="bg-earth-green h-2 rounded-full transition-all duration-1000" style="width: ${percent}%"></div>
+                    </div>
+                    <button onclick="manualSave(${g.id})" class="w-full bg-[#f5f2ed] text-[#6d5f56] py-2 rounded-xl text-[10px] font-bold border border-[#e8e2d6]">手動投入金額</button>
+                </div>
+            `;
+        }
+
+        function manualSave(id) {
+            const val = prompt("今天要存入多少？");
+            if(val && !isNaN(val)) saveChallenge("手動存錢", parseFloat(val));
+        }
+
+        // ================= 輔助工具 =================
+        function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
+        function showToast(m) { const t = document.getElementById('toast'); t.innerText = m; t.style.opacity = 1; setTimeout(()=>t.style.opacity=0, 2500); }
+        function switchPage(p) {
+            document.getElementById('page-ledger').classList.toggle('hidden', p!=='ledger');
+            document.getElementById('page-savings').classList.toggle('hidden', p!=='savings');
+            document.getElementById('nav-ledger').className = p==='ledger' ? 'text-sm tab-active' : 'text-sm text-gray-400';
+            document.getElementById('nav-savings').className = p==='savings' ? 'text-sm tab-active' : 'text-sm text-gray-400';
+            updateSlogan();
+        }
+        function changeType(t) { currentType = t; refreshForm(); }
+        function refreshForm() {
+            document.getElementById('catInput').innerHTML = cats[currentType].map(c => `<option>${c}</option>`).join('');
+            document.getElementById('methodInput').innerHTML = methods[currentType].map(m => `<option>${m}</option>`).join('');
+            document.getElementById('attrInput').innerHTML = currentType==='income'?'<option>一般收入</option>':'<option>變動支出</option><option>固定支出</option>';
+        }
+        function updateSlogan() {
+            const el = document.getElementById('randomSlogan');
+            el.style.opacity = 0;
+            setTimeout(() => {
+                el.innerText = slogans[Math.floor(Math.random() * slogans.length)];
+                el.style.opacity = 1;
+            }, 300);
+        }
+        function updateChallengeHints() {
+            document.getElementById('hint365').innerText = `今日建議: $${getDayOfYear()}`;
+            document.getElementById('hint52').innerText = `本週建議: $${getWeekOfYear() * 10}`;
+        }
+        function getDayOfYear() { return Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000); }
+        function getWeekOfYear() { return Math.ceil((((new Date() - new Date(new Date().getFullYear(), 0, 1)) / 86400000) + new Date(new Date().getFullYear(), 0, 1).getDay() + 1) / 7); }
+        function getRandomAmt() { return Math.floor(Math.random() * (500 - 50 + 1)) + 50; }
+    </script>
+</body>
+</html>
